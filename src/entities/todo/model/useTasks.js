@@ -1,114 +1,103 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import tasksAPI from "@/shared/api/tasks/tasksAPI";
+import { useCallback, useEffect, useMemo, useRef, useState, useReducer } from 'react'
+import tasksAPI from '@/shared/api/tasks'
+
+const tasksReducer = (state, action) => {
+  switch (action.type) {
+    case 'SET_ALL': {
+      return Array.isArray(action.tasks) ? action.tasks : state
+    }
+    case 'ADD': {
+      return [...state, action.task]
+    }
+    case 'TOGGLE_COMPLETE': {
+      const { id, isDone } = action
+
+      return state.map((task) => {
+        return task.id === id ? { ...task, isDone } : task
+      })
+    }
+    case 'DELETE': {
+      return state.filter((task) => task.id !== action.id)
+    }
+    case 'DELETE_ALL': {
+      return []
+    }
+    default: {
+      return state
+    }
+  }
+}
 
 const useTasks = () => {
-  const [tasks, setTasks] = useState([]);
+  const [tasks, dispatch] = useReducer(tasksReducer, [])
 
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [disappearingTaskId, setDisappearingTaskId] = useState(null);
-  const [appearingTaskId, setAppearingTaskId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('')
+  const [disappearingTaskId, setDisappearingTaskId] = useState(null)
+  const [appearingTaskId, setAppearingTaskId] = useState(null)
 
-  const newTaskInputRef = useRef(null);
+  const newTaskInputRef = useRef(null)
 
-  // Удаление всех задач
-  const deleteAllTasks = useCallback(async () => {
-    const isConfirmed = confirm("Are you sure you want to delete all?");
+  const deleteAllTasks = useCallback(() => {
+    const isConfirmed = confirm('Are you sure you want to delete all?')
 
-    if (!isConfirmed) return;
-
-    try {
-      // Удаляем задачи последовательно, чтобы не перегружать сервер
-      for (const task of tasks) {
-        const response = await fetch(`https://2b694d80923013f1.mokky.dev/Tasks/${task.id}`, {
-          method: "DELETE",
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete task ${task.id}`);
-        }
-      }
-
-      // После успешного удаления всех задач очищаем локальное состояние
-      setTasks([]);
-      console.log("Все задачи успешно удалены");
-      alert("Все задачи удалены!");
-    } catch (error) {
-      console.error("Ошибка при удалении задач:", error);
-      alert("Произошла ошибка при удалении задач. Пожалуйста, обновите страницу.");
-
-      // Загружаем актуальное состояние с сервера
-      const response = await fetch("https://2b694d80923013f1.mokky.dev/Tasks");
-      const updatedTasks = await response.json();
-      setTasks(updatedTasks);
+    if (isConfirmed) {
+      tasksAPI.deleteAll(tasks)
+        .then(() => dispatch({ type: 'DELETE_ALL' }))
     }
-  }, [tasks]);
+  }, [tasks])
 
-  // Удаление выбранной задачи
-  const deleteTask = useCallback(
-    (taskId) => {
-      tasksAPI.delete(taskId).then(() => {
-        setDisappearingTaskId(taskId);
+  const deleteTask = useCallback((taskId) => {
+    tasksAPI.delete(taskId)
+      .then(() => {
+        setDisappearingTaskId(taskId)
         setTimeout(() => {
-          setTasks(tasks.filter((task) => task.id !== taskId));
-          setDisappearingTaskId(null);
-        }, 400);
-      });
-    },
-    [tasks],
-  );
+          dispatch({ type: 'DELETE', id: taskId })
+          setDisappearingTaskId(null)
+        }, 400)
+      })
+  }, [])
 
-  // Выбор задачи для отметки о её выполнении
-  const toggleTaskComplete = useCallback(
-    (taskId, isDone) => {
-      tasksAPI.toggleComplete(taskId, isDone).then(() => {
-        setTasks(
-          tasks.map((task) => {
-            if (task.id === taskId) {
-              return { ...task, isDone };
-            }
-            return task;
-          }),
-        );
-      });
-    },
-    [tasks],
-  );
+  const toggleTaskComplete = useCallback((taskId, isDone) => {
+    tasksAPI.toggleComplete(taskId, isDone)
+      .then(() => {
+        dispatch({ type: 'TOGGLE_COMPLETE', id: taskId, isDone })
+      })
+  }, [])
 
-  // Добавление задачи
-  const addTask = useCallback((title) => {
+  const addTask = useCallback((title, callbackAfterAdding) => {
     const newTask = {
       title,
       isDone: false,
-    };
+    }
 
-    tasksAPI.add(newTask).then((addedTask) => {
-      setTasks((prevTasks) => [...prevTasks, addedTask]);
-      setNewTaskTitle("");
-      setSearchQuery("");
-      newTaskInputRef.current.focus();
-      setAppearingTaskId(addedTask.id);
-      setTimeout(() => {
-        setAppearingTaskId(null);
-      }, 400);
-    });
-  }, []);
+    tasksAPI.add(newTask)
+      .then((addedTask) => {
+        dispatch({ type: 'ADD', task: addedTask })
+        callbackAfterAdding()
+        setSearchQuery('')
+        newTaskInputRef.current.focus()
+        setAppearingTaskId(addedTask.id)
+        setTimeout(() => {
+          setAppearingTaskId(null)
+        }, 400)
+      })
+  }, [])
 
-  // Загрузка задач при монтировании
   useEffect(() => {
-    newTaskInputRef.current.focus();
+    newTaskInputRef.current.focus()
 
-    tasksAPI.getAll().then(setTasks);
-  }, []);
+    tasksAPI.getAll().then((serverTasks) => {
+      dispatch({ type: 'SET_ALL', tasks: serverTasks })
+    })
+  }, [])
 
-  // Фильтрация задач
   const filteredTasks = useMemo(() => {
-    const clearSearchQuery = searchQuery.trim().toLowerCase();
+    const clearSearchQuery = searchQuery.trim().toLowerCase()
 
     return clearSearchQuery.length > 0
       ? tasks.filter(({ title }) => title.toLowerCase().includes(clearSearchQuery))
-      : null;
-  }, [searchQuery, tasks]);
+      : null
+  }, [searchQuery, tasks])
 
   return {
     tasks,
@@ -116,15 +105,13 @@ const useTasks = () => {
     deleteTask,
     deleteAllTasks,
     toggleTaskComplete,
-    newTaskTitle,
-    setNewTaskTitle,
     searchQuery,
     setSearchQuery,
     newTaskInputRef,
     addTask,
     disappearingTaskId,
     appearingTaskId,
-  };
-};
+  }
+}
 
-export default useTasks;
+export default useTasks

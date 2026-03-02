@@ -1,23 +1,30 @@
-// Форма поиска по задачам
+import Field from '@/shared/ui/Field'
+import { useContext } from 'react'
+import { TasksContext } from '@/entities/todo'
 
-import { useContext } from "react";
-import Field from "@/shared/ui/Field/Field";
-import { TasksContext } from "@/entities/todo";
+const SearchTaskForm = (props) => {
+  const { styles } = props
 
-const SearchTaskForm = ({ styles }) => {
-  const { searchQuery, setSearchQuery } = useContext(TasksContext);
+  const {
+    searchQuery,
+    setSearchQuery,
+  } = useContext(TasksContext)
+
   return (
-    <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
+    <form
+      className={styles.form}
+      onSubmit={(event) => event.preventDefault()}
+    >
       <Field
         className={styles.field}
-        label='Search task'
-        id='search-task'
-        type='search'
+        label="Search task"
+        id="search-task"
+        type="search"
         value={searchQuery}
         onInput={(event) => setSearchQuery(event.target.value)}
       />
     </form>
-  );
-};
+  )
+}
 
-export default SearchTaskForm;
+export default SearchTaskForm

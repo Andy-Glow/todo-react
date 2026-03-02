@@ -1,1 +1,1 @@
-export { default } from "./ToDoInfo";
+export { default } from './TodoInfo'

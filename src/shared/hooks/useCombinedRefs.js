@@ -1,19 +1,17 @@
-// Утилитарный хук
-
 const useCombinedRefs = (...refs) => {
   return (node) => {
     refs.forEach((ref) => {
       if (!ref) {
-        return;
+        return
       }
 
-      if (typeof ref === "function") {
-        ref(node);
+      if (typeof ref === 'function') {
+        ref(node)
       } else {
-        ref.current = node;
+        ref.current = node
       }
-    });
-  };
-};
+    })
+  }
+}
 
-export default useCombinedRefs;
+export default useCombinedRefs
